@@ -1778,6 +1778,8 @@
         };
 
         //-------------------------- sast vars --------------------------------------
+        var sastEnabled= verifyVar([${it.sastEnabled}]);
+        sastEnabled = (sastEnabled == undefined || sastEnabled == null || sastEnabled == true); //for backward compatibility, sastEnabled is false only if its explicitly false
         var sastResultsReady = verifyVar([${it.resultIsValid}]);
         var pdfReportReady = verifyVar([${it.pdfReportReady}]);
 
@@ -1875,8 +1877,8 @@
         var osaEndDate = verifyVar(["${it.osaScanResult.osaScanEndTime}"]);
 
         var isOsaFullReady =
-                osaStartDate != ' ' &amp;&amp;
-                osaEndDate != ' ';
+                osaStartDate != '' &amp;&amp;
+                osaEndDate != '';
 
         var osaNumFiles = okLibraries + osaVulnerableAndOutdatedLibs;
 
@@ -1913,7 +1915,7 @@
                 '<div class="sast-error-text">Scan failed</div>' +
                 '</div>'
         //---------------------------------------------------------- summary ---------------------------------------------------------------
-        if (!sastResultsReady) {
+        if (sastEnabled &amp;&amp; !sastResultsReady) {
             document.getElementById("no-scan-message-sast-failed").setAttribute("style", "display:inline-block");
             document.getElementById("sast-results").setAttribute("style", "visibility:hidden");
             document.getElementById("sast-title-links").setAttribute("style", "visibility:hidden");
@@ -1993,6 +1995,11 @@
                     console.error("Element missing in SAST threshold section " + e.message);
                 }
             }
+        }
+
+        if(osaEnabled &amp;&amp; !sastEnabled) {
+            document.getElementById("sast-summary").setAttribute("style", "display:none");
+            document.getElementById("osa-summary").setAttribute("class", "sast-summary chart-large");
         }
 
         if (!osaEnabled) {

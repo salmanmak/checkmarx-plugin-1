@@ -33,6 +33,8 @@ public class CxScanResult implements Action {
 
     private long scanId;
 
+    private Boolean sastEnabled;
+
     private boolean osaEnabled;
 
     //Results
@@ -132,6 +134,14 @@ public class CxScanResult implements Action {
 
     public void setOsaEnabled(boolean osaEnabled) {
         this.osaEnabled = osaEnabled;
+    }
+
+    public Boolean getSastEnabled() {
+        return sastEnabled;
+    }
+
+    public void setSastEnabled(Boolean sastEnabled) {
+        this.sastEnabled = sastEnabled;
     }
 
     public boolean isThresholdsEnabled() {

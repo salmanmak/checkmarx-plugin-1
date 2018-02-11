@@ -89,6 +89,8 @@ public class CxScanBuilder extends Builder implements SimpleBuildStep {
     @Nullable
     private String teamPath;
 
+    private Boolean sastEnabled = true;
+
     @Nullable
     private String preset;
     private boolean presetSpecified;
@@ -193,6 +195,7 @@ public class CxScanBuilder extends Builder implements SimpleBuildStep {
             String buildStep,
             @Nullable String groupId,
             @Nullable String teamPath, //used by pipeline
+            Boolean sastEnabled,
             @Nullable String preset,
             JobStatusOnError jobStatusOnError,
             boolean presetSpecified,
@@ -234,6 +237,7 @@ public class CxScanBuilder extends Builder implements SimpleBuildStep {
         this.projectId = projectId;
         this.groupId = groupId;
         this.teamPath = teamPath;
+        this.sastEnabled = sastEnabled;
         this.preset = preset;
         this.jobStatusOnError = jobStatusOnError;
         this.presetSpecified = presetSpecified;
@@ -326,6 +330,14 @@ public class CxScanBuilder extends Builder implements SimpleBuildStep {
     @Nullable
     public String getTeamPath() {
         return teamPath;
+    }
+
+    public Boolean getSastEnabled() {
+        return sastEnabled;
+    }
+
+    public void setSastEnabled(Boolean sastEnabled) {
+        this.sastEnabled = sastEnabled;
     }
 
     @Nullable
@@ -683,6 +695,12 @@ public class CxScanBuilder extends Builder implements SimpleBuildStep {
         //set to the logger to print into the job console
         jobConsoleLogger = new CxPluginLogger(listener);
 
+        if(sastEnabled != null && !sastEnabled && !osaEnabled) { //assuming that if sastEnabled is null, then it is enabled (for backward compatibility)
+            jobConsoleLogger.error("Failed to execute Checkmarx scan. Both OSA and SAST are disabled.");
+            run.setResult(Result.FAILURE);
+            return;
+        }
+
         final DescriptorImpl descriptor = getDescriptor();
 
         CxWSResponseRunID cxWSResponseRunID = null;
@@ -726,6 +744,12 @@ public class CxScanBuilder extends Builder implements SimpleBuildStep {
             }
 
             projectId = cxWebService.resolveProjectId(run.getEnvironment(listener).expand(projectName), groupId);
+
+            if(sastEnabled != null && !sastEnabled && osaEnabled) { //assuming that if sastEnabled is null, then it is enabled (for backward compatibility)
+                runOsaOnly(run, workspace, serverUrlToUseNotNull, usernameToUse, passwordToUse, cxWebService, listener, scanShouldRunAsynchronous(descriptor), checkmarxBuildDir);
+                return;
+            }
+
             if (needToAvoidDuplicateProjectScans(cxWebService)) {
                 jobConsoleLogger.info("\nAvoid duplicate project scans in queue\n");
                 return;
@@ -913,6 +937,74 @@ public class CxScanBuilder extends Builder implements SimpleBuildStep {
                 cxWebService.cancelScan(cxWSResponseRunID.getRunId());
             }
             throw e;
+        }
+    }
+
+    private void runOsaOnly(Run<?, ?> run, FilePath workspace, String baseUri, String user, String password, CxWebService webServiceClient, TaskListener listener, boolean shouldRunAsynchronous, File checkmarxBuildDir) {
+
+        if(projectId == 0) {
+            jobConsoleLogger.error("Failed to execute CxOSA scan. No project found to associate scan with (project name: " +projectName+", teamId: "+groupId+")");
+            run.setResult(Result.FAILURE);
+            return;
+        }
+
+        ThresholdConfig osaThresholdConfig = createOsaThresholdConfig();
+
+        OsaScanResult osaScanResult = analyzeOpenSources(run, workspace, baseUri, user, password, webServiceClient, listener, shouldRunAsynchronous);
+        CxScanResult cxScanResult = addScanResultAction(run, baseUri, shouldRunAsynchronous, null);
+        cxScanResult.setOsaScanResult(osaScanResult);
+        cxScanResult.setSastEnabled(false);
+        cxScanResult.setOsaEnabled(true);
+
+        if(shouldRunAsynchronous) {
+
+            if(osaScanResult != null) {
+                if(!osaScanResult.isOsaLicense()) {
+                    run.setResult(Result.FAILURE);
+                    return;
+                }
+
+                cxScanResult.setOsaSuccessful(true);
+            }
+            return;
+
+        }
+
+
+        if(osaScanResult == null || !osaScanResult.isOsaLicense()) {
+            jobConsoleLogger.error("Failed to execute CxOSA scan");
+            run.setResult(Result.FAILURE);
+            return;
+        }
+
+        cxScanResult.setOsaSuccessful(true);
+
+
+        // Set scan thresholds for the summery.jelly
+        if (isOsaThresholdEffectivelyEnabled()) {
+            cxScanResult.setOsaThresholds(osaThresholdConfig);
+        }
+
+        createOsaJsonReports(osaScanResult, checkmarxBuildDir);
+
+        //OSA Threshold
+        thresholdsError = new StringBuilder();
+        boolean isOSAThresholdFailedTheBuild = isOsaThresholdEffectivelyEnabled() && isThresholdCrossed(osaThresholdConfig, cxScanResult.getOsaScanResult().getOsaHighCount(), cxScanResult.getOsaScanResult().getOsaMediumCount(), cxScanResult.getOsaScanResult().getOsaLowCount(), "OSA ");
+
+
+        jobConsoleLogger.info("Copying reports to workspace");
+        copyReportsToWorkspace(workspace, checkmarxBuildDir);
+
+        if (isOSAThresholdFailedTheBuild) {
+            run.setResult(Result.FAILURE);
+            jobConsoleLogger.info("*************************");
+            jobConsoleLogger.info("The Build Failed due to: ");
+            jobConsoleLogger.info("*************************");
+            String[] lines = thresholdsError.toString().split("\\n");
+            for (String s : lines) {
+                jobConsoleLogger.info(s);
+            }
+            jobConsoleLogger.info("---------------------------------------------------------------------");
         }
     }
 
