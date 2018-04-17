@@ -1,11 +1,11 @@
-<?jelly escape-by-default='true'?>
+<?jelly escape-by-default='false'?>
 <!--suppress ALL -->
 <j:jelly xmlns:j="jelly:core" xmlns:st="jelly:stapler" xmlns:d="jelly:define" xmlns:l="/lib/layout"
          xmlns:t="/lib/hudson" xmlns:f="/lib/form">
 
     <j:if test="${it.lastSynchronousBuildAction.showResults}">
 
-        <j:set var="html_var" value="${it.getHtmlReport()}"/>
+        <j:set var="html_var" value="${it.lastSynchronousBuildAction.getHtmlReport()}"/>
 
         <j:if test="${it.lastSynchronousBuildAction.scanRanAsynchronous}">
             <style>
