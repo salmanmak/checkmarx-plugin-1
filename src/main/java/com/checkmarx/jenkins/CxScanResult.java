@@ -3,10 +3,10 @@ package com.checkmarx.jenkins;
 import com.checkmarx.jenkins.logger.CxPluginLogger;
 import hudson.PluginWrapper;
 import hudson.model.Action;
-import hudson.model.Hudson;
 import hudson.model.Run;
 import hudson.util.IOUtils;
 import jenkins.model.Jenkins;
+import org.apache.commons.io.FileUtils;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 import org.kohsuke.stapler.StaplerRequest;
@@ -15,8 +15,11 @@ import org.kohsuke.stapler.StaplerResponse;
 import javax.servlet.ServletOutputStream;
 import java.io.File;
 import java.io.IOException;
+import java.nio.charset.Charset;
 import java.util.LinkedList;
 import java.util.List;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 /**
  * @author denis
@@ -196,6 +199,21 @@ public class CxScanResult implements Action {
 
         outputStream.flush();
         outputStream.close();
+    }
+
+    public String getHtmlReport() throws IOException {
+        //todo handle errors
+        File buildDirectory = owner.getRootDir();
+        File a = new File(buildDirectory, "/checkmarx/report.html");
+        String ret =  FileUtils.readFileToString(a, Charset.defaultCharset());
+        Pattern patt = Pattern.compile("(<div[^>]*)(\\s*/>)");
+        Matcher mattcher = patt.matcher(ret);
+        if (mattcher.find()){
+             ret = mattcher.replaceAll("$1></div>");
+        }
+
+        return ret;
+
     }
 
     /**
