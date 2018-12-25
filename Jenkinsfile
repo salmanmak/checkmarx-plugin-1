@@ -79,5 +79,24 @@ pipeline {
         bat "gradlew.bat -DIsReleaseBuild=false -DBranchName=${BranchName} -P buildNumber=${BUILD_NUMBER} -P repositoryVersion=${GIT_COMMIT} --stacktrace clean build"
       }
     }
+	  
+    stage('Archive Artifacts') {
+      steps {
+        archiveArtifacts 'build/libs/*.*'
+      }
+    }
+	 
+    stage('Publish HTML Reports') {
+      steps {
+        publishHTML([allowMissing: false, alwaysLinkToLastBuild: false, keepAll: false, reportDir: 'build/reports/tests', reportFiles: 'index.html', reportName: 'HTML Report', reportTitles: ''])
+      }
+    }
+	  
+    stage('Publish HTML Reports') {
+      steps {
+        junit '**/test-results/*.xml'
+      }
+    }
+	  
   }
 }
