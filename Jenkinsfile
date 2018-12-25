@@ -74,10 +74,9 @@ pipeline {
       }
     }
 	
-	stage('Build') {
+    stage('Build') {
       steps {
         bat 'gradlew.bat -DIsReleaseBuild=false -DBranchName=${BranchName} -P buildNumber=${BUILD_NUMBER} -P repositoryVersion=${GIT_COMMIT} --stacktrace clean build'
-        }
       }
     }
   }
