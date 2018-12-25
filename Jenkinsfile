@@ -16,61 +16,70 @@ pipeline {
       steps {
         
         powershell '''#------------------------------------------------------------------------------------------------------------
-# REMOVE THE WORD SNAPSHOT (ONLY FOR RELEASE BUILDS)
-#------------------------------------------------------------------------------------------------------------
+		# REMOVE THE WORD SNAPSHOT (ONLY FOR RELEASE BUILDS)
+		#------------------------------------------------------------------------------------------------------------
 
-[string]$IsReleaseBuild = $ENV:IsReleaseBuild
-[string]$RootPath = "C:\\CI-Slave\\workspace\\$ENV:JOB_NAME"
+		[string]$IsReleaseBuild = $ENV:IsReleaseBuild
+		[string]$RootPath = "C:\\CI-Slave\\workspace\\$ENV:JOB_NAME"
 
 
-If($IsReleaseBuild -eq "true")
-{
-    Write-Host " ----------------------------------------------------- "
-    Write-Host "|  SNAPSHOT DISABLED: Removing Snapshot before build  |"
-    Write-Host " ----------------------------------------------------- "
+		If($IsReleaseBuild -eq "true")
+		{
+			Write-Host " ----------------------------------------------------- "
+			Write-Host "|  SNAPSHOT DISABLED: Removing Snapshot before build  |"
+			Write-Host " ----------------------------------------------------- "
 
-    $FilePath1 = $RootPath + "\\gradle.properties"
-    $FilePath2 = $RootPath + "\\build.gradle"
+			$FilePath1 = $RootPath + "\\gradle.properties"
+			$FilePath2 = $RootPath + "\\build.gradle"
 
-    If(Test-Path "$FilePath1")
-    {  
-        $FileContent = Get-Content -Path $FilePath1
-        Foreach($LineContent in $FileContent)
-        {
-            If($LineContent.Length -gt 9)
-            {
-                If($LineContent.Substring(0,9) -eq "version =")
-                {
-                    $NewLineContent = $LineContent.Replace("-SNAPSHOT", "")
-                    (Get-Content $FilePath1) | ForEach-Object { $_ -replace "$LineContent", "$NewLineContent" } | Set-Content "$FilePath1"
-                }
-            }
-        }
+			If(Test-Path "$FilePath1")
+			{  
+				$FileContent = Get-Content -Path $FilePath1
+				Foreach($LineContent in $FileContent)
+				{
+					If($LineContent.Length -gt 9)
+					{
+						If($LineContent.Substring(0,9) -eq "version =")
+						{
+							$NewLineContent = $LineContent.Replace("-SNAPSHOT", "")
+							(Get-Content $FilePath1) | ForEach-Object { $_ -replace "$LineContent", "$NewLineContent" } | Set-Content "$FilePath1"
+						}
+					}
+				}
+			}
+
+			If(Test-Path "$FilePath2")
+			{
+				$FileContent = Get-Content -Path $FilePath2
+				Foreach($LineContent in $FileContent)
+				{
+					If($LineContent.Length -gt 9)
+					{
+						If($LineContent.Substring(0,9) -eq "version =")
+						{
+							$NewLineContent = $LineContent.Replace("-SNAPSHOT", "")
+							(Get-Content $FilePath2) | ForEach-Object { $_ -replace "$LineContent", "$NewLineContent" } | Set-Content "$FilePath2"
+						}
+					}
+				}
+			}
+		}
+		Else
+		{
+			Write-Host " ----------------------------------------------------- "
+			Write-Host "|    SNAPSHOT ENABLED: Run Build without modifying    |"
+			Write-Host " ----------------------------------------------------- " 
+		}'''
+
+      }
     }
-
-    If(Test-Path "$FilePath2")
-    {
-        $FileContent = Get-Content -Path $FilePath2
-        Foreach($LineContent in $FileContent)
-        {
-            If($LineContent.Length -gt 9)
-            {
-                If($LineContent.Substring(0,9) -eq "version =")
-                {
-                    $NewLineContent = $LineContent.Replace("-SNAPSHOT", "")
-                    (Get-Content $FilePath2) | ForEach-Object { $_ -replace "$LineContent", "$NewLineContent" } | Set-Content "$FilePath2"
-                }
-            }
+	
+	stage('Build') {
+      steps {
+        gradle {
+            tasks('clean build')
+            switches('-P buildNumber=${BUILD_NUMBER} -P repositoryVersion=${GIT_COMMIT} --stacktrace')
         }
-    }
-}
-Else
-{
-    Write-Host " ----------------------------------------------------- "
-    Write-Host "|    SNAPSHOT ENABLED: Run Build without modifying    |"
-    Write-Host " ----------------------------------------------------- " 
-}'''
-
       }
     }
   }
