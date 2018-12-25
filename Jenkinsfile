@@ -76,9 +76,7 @@ pipeline {
 	
 	stage('Build') {
       steps {
-        gradle {
-            tasks('clean build')
-            switches('-P buildNumber=${BUILD_NUMBER} -P repositoryVersion=${GIT_COMMIT} --stacktrace')
+        bat 'gradlew.bat -DIsReleaseBuild=false -DBranchName=${BranchName} -P buildNumber=${BUILD_NUMBER} -P repositoryVersion=${GIT_COMMIT} --stacktrace clean build'
         }
       }
     }
