@@ -92,7 +92,7 @@ pipeline {
       }
     }
 	  
-    stage('Publish HTML Reports') {
+    stage('Publish JUnit Test Results') {
       steps {
         junit '**/test-results/*.xml'
       }
