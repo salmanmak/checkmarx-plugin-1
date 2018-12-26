@@ -1,102 +1,83 @@
 pipeline {
-  
-  parameters {        
-        booleanParam(name: 'IsReleaseBuild', description: 'Check the box if you want to create a release build') 
-        string(name: 'BranchName', defaultValue: 'master', description: 'Branch used by the job')  
-    }
-  
-  agent {
-    node {
-      label 'Plugins'
+	parameters {        
+		booleanParam(name: 'IsReleaseBuild', description: 'Check the box if you want to create a release build') 
+		string(name: 'BranchName', defaultValue: 'master', description: 'Branch used by the job')  
+	}
+    agent {
+        node { label 'Plugins' }
     }
 
-  }
-  stages {
-    stage('Remove Snapshot') {
-      steps {
-        
-        powershell '''#------------------------------------------------------------------------------------------------------------
-		# REMOVE THE WORD SNAPSHOT (ONLY FOR RELEASE BUILDS)
-		#------------------------------------------------------------------------------------------------------------
+    stages {
+        stage('Pipeline Info') {
+            steps {
+                echo bat(returnStdout: true, script: 'set')
+            }
+        }
+		
+		//stage ('Clean Workspace') {
+        //    steps {
+        //        cleanWs()
+        //    }        
+        //}
 
-		[string]$IsReleaseBuild = $ENV:IsReleaseBuild
-		[string]$RootPath = "C:\\CI-Slave\\workspace\\$ENV:JOB_NAME"
+        stage('Remove Snapshot From Build') {
+            when {
+                expression {
+                    return params.IsReleaseBuild
+                }
+            }
+            steps {
+                echo " ----------------------------------------------------- "
+                echo "|  SNAPSHOT DISABLED: Removing Snapshot Before Build  |"
+                echo " ----------------------------------------------------- "
 
-
-		If($IsReleaseBuild -eq "true")
-		{
-			Write-Host " ----------------------------------------------------- "
-			Write-Host "|  SNAPSHOT DISABLED: Removing Snapshot before build  |"
-			Write-Host " ----------------------------------------------------- "
-
-			$FilePath1 = $RootPath + "\\gradle.properties"
-			$FilePath2 = $RootPath + "\\build.gradle"
-
-			If(Test-Path "$FilePath1")
-			{  
-				$FileContent = Get-Content -Path $FilePath1
-				Foreach($LineContent in $FileContent)
-				{
-					If($LineContent.Length -gt 9)
-					{
-						If($LineContent.Substring(0,9) -eq "version =")
+                dir("cli") {
+                    powershell '''		If(Test-Path gradle.properties)
+					{  
+						$FileContent = Get-Content -Path gradle.properties
+						Foreach($LineContent in $FileContent)
 						{
-							$NewLineContent = $LineContent.Replace("-SNAPSHOT", "")
-							(Get-Content $FilePath1) | ForEach-Object { $_ -replace "$LineContent", "$NewLineContent" } | Set-Content "$FilePath1"
+							If($LineContent.Length -gt 9)
+							{
+								If($LineContent.Substring(0,9) -eq "version =")
+								{
+									$NewLineContent = $LineContent.Replace("-SNAPSHOT", "")
+									(Get-Content gradle.properties) | ForEach-Object { $_ -replace "$LineContent", "$NewLineContent" } | Set-Content gradle.properties
+								}
+							}
 						}
-					}
-				}
-			}
-
-			If(Test-Path "$FilePath2")
-			{
-				$FileContent = Get-Content -Path $FilePath2
-				Foreach($LineContent in $FileContent)
-				{
-					If($LineContent.Length -gt 9)
-					{
-						If($LineContent.Substring(0,9) -eq "version =")
+					}'''
+					
+					powershell '''		If(Test-Path build.gradle)
+					{  
+						$FileContent = Get-Content -Path build.gradle
+						Foreach($LineContent in $FileContent)
 						{
-							$NewLineContent = $LineContent.Replace("-SNAPSHOT", "")
-							(Get-Content $FilePath2) | ForEach-Object { $_ -replace "$LineContent", "$NewLineContent" } | Set-Content "$FilePath2"
+							If($LineContent.Length -gt 9)
+							{
+								If($LineContent.Substring(0,9) -eq "version =")
+								{
+									$NewLineContent = $LineContent.Replace("-SNAPSHOT", "")
+									(Get-Content build.gradle) | ForEach-Object { $_ -replace "$LineContent", "$NewLineContent" } | Set-Content build.gradle
+								}
+							}
 						}
-					}
+					}'''
+                }
+            }
+        }
+
+        stage('Build') {
+            steps {
+				dir("cli") {
+					bat "gradlew.bat -DIsReleaseBuild=${params.IsReleaseBuild} -DBranchName=master --stacktrace clean build && exit %%ERRORLEVEL%%"
 				}
+            }
+        }
+		stage('Archive Artifacts') {
+			steps {
+				archiveArtifacts 'cli/build/distributions/*.zip'
 			}
 		}
-		Else
-		{
-			Write-Host " ----------------------------------------------------- "
-			Write-Host "|    SNAPSHOT ENABLED: Run Build without modifying    |"
-			Write-Host " ----------------------------------------------------- " 
-		}'''
-
-      }
     }
-	
-    stage('Build') {
-      steps {
-        bat "gradlew.bat -DIsReleaseBuild=false -DBranchName=${BranchName} -P buildNumber=${BUILD_NUMBER} -P repositoryVersion=${GIT_COMMIT} --stacktrace clean build"
-      }
-    }
-	  
-    stage('Archive Artifacts') {
-      steps {
-        archiveArtifacts 'build/libs/*.*'
-      }
-    }
-	 
-    stage('Publish HTML Reports') {
-      steps {
-        publishHTML([allowMissing: false, alwaysLinkToLastBuild: false, keepAll: false, reportDir: 'build/reports/tests', reportFiles: 'index.html', reportName: 'HTML Report', reportTitles: ''])
-      }
-    }
-	  
-    stage('Publish JUnit Test Results') {
-      steps {
-        junit '**/test-results/*.xml'
-      }
-    }
-	  
-  }
 }
