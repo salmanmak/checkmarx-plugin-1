@@ -69,9 +69,9 @@ pipeline {
 
         stage('Build') {
             steps {
-				dir("cli") {
+				//dir("cli") {
 					bat "gradlew.bat -DIsReleaseBuild=${params.IsReleaseBuild} -DBranchName=master --stacktrace clean build && exit %%ERRORLEVEL%%"
-				}
+				//}
             }
         }
 		stage('Archive Artifacts') {
